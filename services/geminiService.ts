@@ -4,11 +4,23 @@ import { AnalysisResult, BoundingBox } from "../types";
 // Helper to get the AI client lazily. 
 // Checks multiple environment variable patterns to ensure it works on Vercel/Vite/Next.
 const getAiClient = () => {
-  const apiKey = 
+  let apiKey = 
     process.env.API_KEY || 
     (import.meta as any).env?.VITE_API_KEY || 
     (import.meta as any).env?.NEXT_PUBLIC_API_KEY ||
     (import.meta as any).env?.REACT_APP_API_KEY;
+
+  // Clean up the key: remove whitespace and quotes (common Vercel env var mistake)
+  if (apiKey) {
+      apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
+  }
+
+  // Debug logging to help user verify they are loading the correct key
+  if (apiKey && apiKey.length > 10) {
+      console.log(`[GridSplit] Using API Key: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`);
+  } else {
+      console.warn("[GridSplit] API Key is missing or too short.");
+  }
 
   if (!apiKey || apiKey === 'undefined' || apiKey === '') {
     throw new Error("MISSING_API_KEY");

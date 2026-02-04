@@ -13,34 +13,8 @@ function App() {
   const [processedImages, setProcessedImages] = useState<CroppedImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<CroppedImage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [detailedError, setDetailedError] = useState<string | null>(null);
   const [isFallbackMode, setIsFallbackMode] = useState(false);
-
-  const getFriendlyErrorMessage = (err: any) => {
-    const msg = err?.message || '';
-    const status = err?.status || err?.code;
-
-    // Missing Key
-    if (msg === 'MISSING_API_KEY') {
-        return "Configuration Error: API Key is missing. If you are on Vercel, please add 'VITE_API_KEY' to your Environment Variables and redeploy.";
-    }
-    
-    // Invalid / Restricted Key (400, 403)
-    if (status === 400 || status === 403 || msg.includes('403') || msg.includes('API key') || msg.includes('permission')) {
-        return "Access Denied: Your API Key is invalid or restricted. Please check your Google AI Studio settings. Ensure your key has no 'HTTP Referer' restrictions blocking this domain.";
-    }
-
-    // Rate Limits
-    if (status === 429 || msg.includes('429')) {
-      return "We're experiencing high traffic (Rate Limit Exceeded). Please try again in a moment.";
-    }
-    
-    // Overloaded
-    if (status === 503 || msg.includes('503')) {
-      return "The AI service is currently overloaded. Please try again shortly.";
-    }
-
-    return `Something went wrong: ${msg.substring(0, 100) || "Unknown error"}. Please try again.`;
-  };
 
   const handleUpdateImage = (id: string, updates: Partial<CroppedImage>) => {
     setProcessedImages(prev => prev.map(img => img.id === id ? { ...img, ...updates } : img));
@@ -52,6 +26,7 @@ function App() {
   const handleFileSelect = async (file: File) => {
     try {
       setError(null);
+      setDetailedError(null);
       setIsFallbackMode(false);
       setStatus(ProcessingStatus.ANALYZING);
       
@@ -76,7 +51,6 @@ function App() {
           const status = aiError?.status || aiError?.code;
 
           // CRITICAL: Check for Auth/Permission errors. 
-          // If the key is bad, we MUST NOT use fallback, we must show the error.
           const isFatalError = 
               msg === 'MISSING_API_KEY' || 
               status === 400 || 
@@ -89,7 +63,6 @@ function App() {
               throw aiError;
           }
 
-          // If it's just a generation error (bad JSON, timeout, etc.), fallback to 3x3
           console.warn("AI analysis failed (non-fatal), falling back to strict 3x3 grid slice.", aiError);
           crops = [];
           usedFallback = true;
@@ -117,9 +90,28 @@ function App() {
       setProcessedImages(finalImages);
       setStatus(ProcessingStatus.COMPLETE);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError(getFriendlyErrorMessage(err));
+      
+      // Parse Error for UI
+      const msg = err?.message || '';
+      const status = err?.status || err?.code;
+      let friendlyMsg = "Something went wrong processing your image. Please try again.";
+
+      if (msg === 'MISSING_API_KEY') {
+         friendlyMsg = "Configuration Error: API Key is missing. If you are on Vercel, please add 'VITE_API_KEY' to your Environment Variables and redeploy.";
+      } else if (status === 400 || status === 403 || msg.includes('API key') || msg.includes('permission')) {
+         friendlyMsg = "Access Denied: Your API Key is invalid or restricted. Please check your Google AI Studio settings.";
+      } else if (status === 429 || msg.includes('429')) {
+         friendlyMsg = "We're experiencing high traffic (Rate Limit Exceeded). Please try again in a moment.";
+      } else if (status === 503 || msg.includes('503')) {
+         friendlyMsg = "The AI service is currently overloaded. Please try again shortly.";
+      }
+
+      setError(friendlyMsg);
+      // Set detailed error for debugging if available
+      setDetailedError(msg !== friendlyMsg ? msg : null);
+      
       setStatus(ProcessingStatus.ERROR);
     }
   };
@@ -150,8 +142,7 @@ function App() {
       } catch (err: any) {
           console.error("Failed to generate prompt", err);
           handleUpdateImage(image.id, { isEnhancingPrompt: false });
-          
-          alert(getFriendlyErrorMessage(err));
+          alert(`Error generating prompt: ${err?.message}`);
       }
   };
 
@@ -160,6 +151,7 @@ function App() {
     setProcessedImages([]);
     setStatus(ProcessingStatus.IDLE);
     setError(null);
+    setDetailedError(null);
     setSelectedImage(null);
     setIsFallbackMode(false);
   };
@@ -270,9 +262,19 @@ function App() {
 
               {/* Error Message */}
               {error && (
-                <div className="p-4 rounded-lg bg-red-900/20 border border-red-900/50 text-red-200 mb-8 max-w-md text-center backdrop-blur-sm">
-                    {error}
-                    <button onClick={handleReset} className="block w-full mt-2 text-sm font-bold underline hover:no-underline">Try Again</button>
+                <div className="p-6 rounded-lg bg-red-950/40 border border-red-900/50 text-red-200 mb-8 max-w-lg text-center backdrop-blur-sm">
+                    <p className="font-semibold text-lg mb-2">Error</p>
+                    <p className="mb-4">{error}</p>
+                    
+                    {detailedError && (
+                        <div className="bg-black/50 p-2 rounded text-xs text-red-400 font-mono mb-4 text-left overflow-x-auto border border-red-900/30">
+                            Details: {detailedError}
+                        </div>
+                    )}
+                    
+                    <button onClick={handleReset} className="inline-block px-4 py-2 bg-red-900/30 hover:bg-red-900/50 rounded-lg text-sm font-bold transition-colors">
+                        Try Again
+                    </button>
                 </div>
               )}
 
