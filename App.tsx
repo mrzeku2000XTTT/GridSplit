@@ -13,6 +13,7 @@ function App() {
   const [processedImages, setProcessedImages] = useState<CroppedImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<CroppedImage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isFallbackMode, setIsFallbackMode] = useState(false);
 
   const getFriendlyErrorMessage = (err: any) => {
     const msg = err?.message || '';
@@ -35,6 +36,7 @@ function App() {
   const handleFileSelect = async (file: File) => {
     try {
       setError(null);
+      setIsFallbackMode(false);
       setStatus(ProcessingStatus.ANALYZING);
       
       // Create local preview
@@ -47,16 +49,15 @@ function App() {
 
       // 2. Send to Gemini for analysis
       let crops;
+      let usedFallback = false;
       try {
           const result = await analyzeGridImage(base64, file.type);
           crops = result.crops;
           if(!crops || crops.length === 0) throw new Error("No crops found");
       } catch (aiError) {
           console.warn("AI analysis failed, falling back to strict 3x3 grid slice.", aiError);
-          // Only fallback if it's NOT a critical API failure we want to show (like 429 persistence)
-          // But for now, fallback is better than broken UI, unless it was a rate limit.
-          // However, fallbackGridSlice doesn't use AI, so it's safe to use if AI fails.
           crops = [];
+          usedFallback = true;
       }
 
       setStatus(ProcessingStatus.CROPPING);
@@ -74,8 +75,10 @@ function App() {
       if (finalImages.length < 2) {
            console.log("Using fallback 3x3 slicer");
            finalImages = await fallbackGridSlice(imgElement);
+           usedFallback = true;
       }
 
+      setIsFallbackMode(usedFallback);
       setProcessedImages(finalImages);
       setStatus(ProcessingStatus.COMPLETE);
 
@@ -123,6 +126,7 @@ function App() {
     setStatus(ProcessingStatus.IDLE);
     setError(null);
     setSelectedImage(null);
+    setIsFallbackMode(false);
   };
 
   return (
@@ -216,10 +220,10 @@ function App() {
 
                     {/* Reset Button (Only visible when complete or error) */}
                     {status === ProcessingStatus.COMPLETE && (
-                        <div className="absolute inset-0 flex items-center justify-center z-30">
+                        <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
                              <button 
                                 onClick={handleReset}
-                                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white px-6 py-3 rounded-full font-medium transition-all hover:scale-105"
+                                className="pointer-events-auto flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white px-6 py-3 rounded-full font-medium transition-all hover:scale-105"
                              >
                                 <RefreshIcon className="w-5 h-5" />
                                 Start Over
@@ -235,6 +239,13 @@ function App() {
                     {error}
                     <button onClick={handleReset} className="block w-full mt-2 text-sm font-bold underline hover:no-underline">Try Again</button>
                 </div>
+              )}
+
+               {/* Fallback Notification */}
+               {status === ProcessingStatus.COMPLETE && isFallbackMode && (
+                  <div className="mb-8 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg text-yellow-200 text-sm max-w-2xl text-center backdrop-blur-sm animate-[fadeIn_0.5s_ease-out]">
+                      <p><strong>Note:</strong> AI Analysis didn't return perfect results (likely due to image complexity or API limits). We used a standard 3x3 grid slice as a fallback.</p>
+                  </div>
               )}
 
               {/* Results */}

@@ -3,10 +3,11 @@ import { AnalysisResult, BoundingBox } from "../types";
 
 // Helper to get the AI client lazily. 
 // This prevents the app from crashing on startup if the API Key is missing or process.env is undefined.
+// We also check import.meta.env for Vite environments where process.env might be empty.
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
   if (!apiKey) {
-    console.warn("API_KEY is missing from process.env");
+    console.warn("API_KEY is missing from process.env and import.meta.env");
   }
   // Initialize even with empty key to allow the app to load; calls will fail gracefully later.
   return new GoogleGenAI({ apiKey: apiKey || '' });
@@ -68,15 +69,20 @@ export const analyzeGridImage = async (
               },
             },
             {
-              text: `Analyze this image. It is expected to be a grid of photos (likely a 3x3 grid, but could vary). 
-              Identify the bounding boxes for every distinct sub-image in the grid. 
-              Return the bounding boxes as normalized integer coordinates (0-1000). 
-              Ignore small gutters or borders between images.
-              Sort the output row by row, from top-left to bottom-right.`,
+              text: `Analyze this image carefully. It is expected to be a grid of photos (likely a 3x3 grid, but could vary). 
+              Task: Identify the precise bounding boxes for every distinct sub-image in the grid. 
+              
+              CRITICAL INSTRUCTIONS:
+              1. Exclude all borders, frames, gutters, and whitespace between images. The crops should be tight on the content.
+              2. Return the bounding boxes as normalized integer coordinates (0-1000). 
+              3. Sort the output row by row, from top-left to bottom-right.
+              
+              Take your time to detect the exact boundaries of each cell.`,
             },
           ],
         },
         config: {
+          thinkingConfig: { thinkingBudget: 2048 }, // Force the model to think/reason about boundaries
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
