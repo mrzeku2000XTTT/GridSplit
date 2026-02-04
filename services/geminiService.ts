@@ -25,15 +25,20 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, baseDelay = 1000)
   try {
     return await fn();
   } catch (error: any) {
-    // If it's a missing key, don't retry, just fail immediately
-    if (error.message === "MISSING_API_KEY") throw error;
+    const msg = error?.message || '';
+    const status = error?.status || error?.code;
 
-    const isRateLimit = error?.status === 429 || error?.code === 429 || (error?.message && error.message.includes('429'));
-    const isOverloaded = error?.status === 503 || error?.code === 503 || (error?.message && error.message.includes('503'));
+    // Fast Fail: Do not retry on Auth/Permission errors (400, 401, 403) or Missing Key
+    if (msg === "MISSING_API_KEY" || status === 400 || status === 401 || status === 403 || msg.includes("API key")) {
+        throw error;
+    }
+
+    const isRateLimit = status === 429 || msg.includes('429');
+    const isOverloaded = status === 503 || msg.includes('503');
 
     if (retries > 0 && (isRateLimit || isOverloaded)) {
         let delay = baseDelay * Math.pow(2, 2 - retries); 
-        console.warn(`API busy (429/503). Retrying in ${delay}ms...`, error.message);
+        console.warn(`API busy (429/503). Retrying in ${delay}ms...`, msg);
         await wait(delay);
         return withRetry(fn, retries - 1, baseDelay);
     }
@@ -113,7 +118,13 @@ export const analyzeGridImage = async (
     console.log("Attempting analysis with Thinking Config...");
     return await attemptAnalysis(true);
   } catch (error: any) {
-    if (error.message === "MISSING_API_KEY") throw error;
+    const msg = error?.message || '';
+    const status = error?.status || error?.code;
+    
+    // Check for Fatal Auth Errors - Do not retry with standard if key is invalid
+    if (msg === "MISSING_API_KEY" || status === 400 || status === 401 || status === 403 || msg.includes("API key")) {
+        throw error;
+    }
 
     // Attempt 2: Fallback to Standard Analysis (Faster, less complex)
     console.warn("Thinking analysis failed, retrying with standard analysis...", error);

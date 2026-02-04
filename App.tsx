@@ -17,16 +17,29 @@ function App() {
 
   const getFriendlyErrorMessage = (err: any) => {
     const msg = err?.message || '';
+    const status = err?.status || err?.code;
+
+    // Missing Key
     if (msg === 'MISSING_API_KEY') {
         return "Configuration Error: API Key is missing. If you are on Vercel, please add 'VITE_API_KEY' to your Environment Variables and redeploy.";
     }
-    if (err?.status === 429 || msg.includes('429')) {
+    
+    // Invalid / Restricted Key (400, 403)
+    if (status === 400 || status === 403 || msg.includes('403') || msg.includes('API key') || msg.includes('permission')) {
+        return "Access Denied: Your API Key is invalid or restricted. Please check your Google AI Studio settings. Ensure your key has no 'HTTP Referer' restrictions blocking this domain.";
+    }
+
+    // Rate Limits
+    if (status === 429 || msg.includes('429')) {
       return "We're experiencing high traffic (Rate Limit Exceeded). Please try again in a moment.";
     }
-    if (err?.status === 503 || msg.includes('503')) {
+    
+    // Overloaded
+    if (status === 503 || msg.includes('503')) {
       return "The AI service is currently overloaded. Please try again shortly.";
     }
-    return "Something went wrong processing your image. Please try again.";
+
+    return `Something went wrong: ${msg.substring(0, 100) || "Unknown error"}. Please try again.`;
   };
 
   const handleUpdateImage = (id: string, updates: Partial<CroppedImage>) => {
@@ -59,12 +72,25 @@ function App() {
           crops = result.crops;
           if(!crops || crops.length === 0) throw new Error("No crops found");
       } catch (aiError: any) {
-          // Critical Config Error: Do not use fallback, show error immediately
-          if (aiError.message === 'MISSING_API_KEY') {
+          const msg = aiError?.message || '';
+          const status = aiError?.status || aiError?.code;
+
+          // CRITICAL: Check for Auth/Permission errors. 
+          // If the key is bad, we MUST NOT use fallback, we must show the error.
+          const isFatalError = 
+              msg === 'MISSING_API_KEY' || 
+              status === 400 || 
+              status === 403 || 
+              status === 401 ||
+              msg.includes('API key') ||
+              msg.includes('permission');
+
+          if (isFatalError) {
               throw aiError;
           }
 
-          console.warn("AI analysis failed, falling back to strict 3x3 grid slice.", aiError);
+          // If it's just a generation error (bad JSON, timeout, etc.), fallback to 3x3
+          console.warn("AI analysis failed (non-fatal), falling back to strict 3x3 grid slice.", aiError);
           crops = [];
           usedFallback = true;
       }
