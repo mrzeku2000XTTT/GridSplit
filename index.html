@@ -28,6 +28,12 @@
         },
       }
     </script>
+    <script>
+      // Polyfill process.env for browser environments to prevent crashes
+      if (typeof process === 'undefined') {
+        window.process = { env: {} };
+      }
+    </script>
     <style>
       body {
         background-color: #000000;

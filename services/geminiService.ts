@@ -1,9 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult, BoundingBox } from "../types";
 
-// Initialize Gemini Client
-// We assume process.env.API_KEY is available as per instructions.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to get the AI client lazily. 
+// This prevents the app from crashing on startup if the API Key is missing or process.env is undefined.
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("API_KEY is missing from process.env");
+  }
+  // Initialize even with empty key to allow the app to load; calls will fail gracefully later.
+  return new GoogleGenAI({ apiKey: apiKey || '' });
+};
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -47,6 +54,7 @@ export const analyzeGridImage = async (
 ): Promise<AnalysisResult> => {
   return withRetry(async () => {
     try {
+      const ai = getAiClient();
       const modelId = "gemini-3-flash-preview";
 
       const response = await ai.models.generateContent({
@@ -130,6 +138,7 @@ export const generateAgentPrompt = async (
 ): Promise<string> => {
     return withRetry(async () => {
         try {
+            const ai = getAiClient();
             // We use Gemini 3 Flash for text reasoning/creative writing
             const modelId = "gemini-3-flash-preview";
 
