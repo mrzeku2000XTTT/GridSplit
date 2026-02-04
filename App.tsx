@@ -127,29 +127,54 @@ function App() {
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-zinc-800 relative overflow-x-hidden">
-        {/* Background Image & Overlay */}
-        <div className="fixed inset-0 z-0">
-             {/* Cinematic Earth Splitting / Canyon Background */}
-             <img 
-                src="https://images.unsplash.com/photo-1535063404122-8356d773db4b?q=80&w=2069&auto=format&fit=crop" 
-                alt="Split Earth Background" 
-                className="w-full h-full object-cover opacity-80 select-none"
-             />
-             {/* Subtle Overlay to ensure text readability without hiding the image */}
-             <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/80" />
-             <div className="absolute inset-0 bg-black/20" />
+        {/* Background Layer */}
+        <div className="fixed inset-0 z-0 overflow-hidden">
+             {originalImageUrl ? (
+                 <>
+                    {/* User's uploaded image as background (Blurred & Darkened) */}
+                    <div className="absolute inset-0 z-0">
+                         <img 
+                            src={originalImageUrl} 
+                            alt="Background Context" 
+                            className="w-full h-full object-cover opacity-40 blur-[80px] scale-125 animate-[pulse_10s_ease-in-out_infinite]"
+                         />
+                    </div>
+                    {/* Gradient Overlay for Readability */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/95 via-black/70 to-black/90 z-10" />
+                 </>
+             ) : (
+                 <>
+                    {/* Default Idle State: Technical Grid / Dark Cinematic */}
+                    <div className="absolute inset-0 bg-zinc-950">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-80" />
+                        
+                        {/* Subtle Grid Pattern */}
+                        <div 
+                            className="absolute inset-0 opacity-[0.15]" 
+                            style={{ 
+                                backgroundImage: `linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)`,
+                                backgroundSize: '40px 40px'
+                            }} 
+                        />
+                        
+                        {/* Cinematic Spotlights */}
+                        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-900/20 rounded-full blur-[120px]" />
+                        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-900/20 rounded-full blur-[120px]" />
+                    </div>
+                 </>
+             )}
         </div>
 
       <div className="relative z-10 container mx-auto px-4 py-12 flex flex-col items-center">
         {/* Header */}
-        <header className="text-center mb-16 space-y-4">
-          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 mb-4 shadow-2xl">
+        <header className="text-center mb-16 space-y-4 animate-[fadeIn_1s_ease-out]">
+          <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 mb-4 shadow-2xl">
              <GridIcon className="w-8 h-8 text-white mr-3" />
              <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white drop-shadow-lg">
                GridSplit AI
              </h1>
           </div>
-          <p className="text-zinc-200 max-w-lg mx-auto text-lg font-medium drop-shadow-md bg-black/30 p-2 rounded-lg backdrop-blur-sm">
+          <p className="text-zinc-300 max-w-lg mx-auto text-lg font-medium drop-shadow-md bg-black/40 p-2 rounded-lg backdrop-blur-sm">
             Upload any photo grid. Our AI instantly detects and splits it into individual high-quality images.
           </p>
         </header>
