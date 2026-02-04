@@ -17,6 +17,9 @@ function App() {
 
   const getFriendlyErrorMessage = (err: any) => {
     const msg = err?.message || '';
+    if (msg === 'MISSING_API_KEY') {
+        return "Configuration Error: API Key is missing. If you are on Vercel, please add 'VITE_API_KEY' to your Environment Variables and redeploy.";
+    }
     if (err?.status === 429 || msg.includes('429')) {
       return "We're experiencing high traffic (Rate Limit Exceeded). Please try again in a moment.";
     }
@@ -50,11 +53,17 @@ function App() {
       // 2. Send to Gemini for analysis
       let crops;
       let usedFallback = false;
+      
       try {
           const result = await analyzeGridImage(base64, file.type);
           crops = result.crops;
           if(!crops || crops.length === 0) throw new Error("No crops found");
-      } catch (aiError) {
+      } catch (aiError: any) {
+          // Critical Config Error: Do not use fallback, show error immediately
+          if (aiError.message === 'MISSING_API_KEY') {
+              throw aiError;
+          }
+
           console.warn("AI analysis failed, falling back to strict 3x3 grid slice.", aiError);
           crops = [];
           usedFallback = true;
